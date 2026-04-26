@@ -1,0 +1,6 @@
+{
+  "dependencies": {},
+  "devDependencies": {
+    "@types/dockerode": "^4.0.1"
+  }
+}
