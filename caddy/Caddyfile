@@ -1,0 +1,20 @@
+{
+  admin :2019 {
+    origins caddy:2019 localhost:2019 127.0.0.1:2019
+  }
+  auto_https off
+}
+
+:80 {
+  handle /api/* {
+    reverse_proxy backend:3001 {
+      header_up Host {host}
+      flush_interval -1
+    }
+  }
+
+  handle {
+    reverse_proxy frontend:80
+  }
+
+}
