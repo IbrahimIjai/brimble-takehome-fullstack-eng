@@ -1,0 +1,68 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "80:80"
+      - "2019:2019"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app-net
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      DB_PATH: /data/deployer.db
+      CADDY_ADMIN_URL: http://caddy:2019
+      BUILDKIT_HOST: docker-container://buildkitd
+      PORT: "3001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - backend_data:/data
+    ports:
+      - "3001:3001"
+    networks:
+      - app-net
+    depends_on:
+      - buildkit
+    restart: unless-stopped
+
+  buildkit:
+    image: moby/buildkit:latest
+    container_name: buildkitd
+    privileged: true
+    volumes:
+      - buildkit_data:/var/lib/buildkit
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    networks:
+      - app-net
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:
+  backend_data:
+  buildkit_data:
+
+networks:
+  app-net:
+    driver: bridge

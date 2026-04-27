@@ -3,4 +3,3 @@ dist
 data
 *.log
 .git
-bun.lock

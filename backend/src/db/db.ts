@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { Database } from "bun:sqlite";
 import path from "path";
 import fs from "fs";
 
@@ -9,9 +9,9 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const db = new Database(DB_PATH);
+const db = new Database(DB_PATH, { create: true });
 
-db.pragma("journal_mode = WAL");
+db.exec("PRAGMA journal_mode = WAL;");
 db.exec(`
   CREATE TABLE IF NOT EXISTS deployments (
     id          TEXT PRIMARY KEY,
@@ -62,9 +62,14 @@ export function createDeployment(data: {
 }): Deployment {
   const stmt = db.prepare(`
     INSERT INTO deployments (id, name, source_type, source_url)
-    VALUES (@id, @name, @source_type, @source_url)
+    VALUES ($id, $name, $source_type, $source_url)
   `);
-  stmt.run(data);
+  stmt.run({
+    $id: data.id,
+    $name: data.name,
+    $source_type: data.source_type,
+    $source_url: data.source_url ?? null,
+  });
   return getDeployment(data.id)!;
 }
 
@@ -80,15 +85,23 @@ export function updateDeployment(
   id: string,
   fields: Partial<Omit<Deployment, "id" | "created_at">>
 ): void {
+  if (Object.keys(fields).length === 0) {
+    return;
+  }
+
   const setClauses = Object.keys(fields)
-    .map((k) => `${k} = @${k}`)
+    .map((k) => `${k} = $${k}`)
     .join(", ");
+
+  const params = Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [`$${key}`, value ?? null])
+  );
 
   db.prepare(`
     UPDATE deployments
     SET ${setClauses}, updated_at = datetime('now')
-    WHERE id = @id
-  `).run({ ...fields, id });
+    WHERE id = $id
+  `).run({ ...params, $id: id });
 }
 
 export function appendLog(deploymentId: string, line: string): void {

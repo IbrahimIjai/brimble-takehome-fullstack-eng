@@ -1,33 +1,35 @@
-FROM node:20-slim AS builder
+FROM oven/bun:1-slim
 
 WORKDIR /app
-COPY package*.json ./
-RUN bun ci --include=dev
 
-COPY tsconfig.json ./
-COPY src ./src
-RUN bun run build
-
-FROM node:20-slim AS runner
-
+# Install dependencies for building and running
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     tar \
     curl \
     ca-certificates \
+    python3 \
+    make \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
+# Install Railpack if needed (as per previous Dockerfile)
 RUN curl -fsSL https://railpack.com/install.sh | sh -s -- --bin-dir /usr/local/bin
-
 ENV PATH="/usr/local/bin:/root/.local/bin:${PATH}"
 
+# Install Docker CLI
 RUN curl -fsSL https://get.docker.com | sh
 
-WORKDIR /app
-COPY package*.json ./
-RUN bun ci --omit=dev
-COPY --from=builder /app/dist ./dist
+# Copy dependency files
+COPY package.json bun.lock ./
+RUN bun install --production
+
+# Copy source code
+COPY . .
+
 RUN mkdir -p /data /tmp/uploads /tmp/builds
+
 EXPOSE 3001
-CMD ["node", "dist/index.js"]
+
+CMD ["bun", "src/index.ts"]
